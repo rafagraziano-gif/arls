@@ -1,77 +1,87 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Lista inicial de aprendizes
-aprendizes = ["Aprendiz 1", "Aprendiz 2", "Aprendiz 3", "Aprendiz 4", "Aprendiz 5", "Aprendiz 6"]
+# ============================
+# CONFIGURAÇÃO GOOGLE SHEETS
+# ============================
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+client = gspread.authorize(creds)
 
-# Lista de atividades
-atividades = [
-    "Minha Iniciação", "1ª Instrução", "2ª Instrução", "3ª Instrução", "4ª Instrução", "5ª Instrução", "6ª Instrução", "7ª Instrução",
-    "O Livro da Lei", "A Coluna Booz", "O Templo de Salomão", "A Pedra Bruta", "O Avental de Aprendiz", "O Bode na Maçonaria",
-    "A Cadeia de União", "Questionário de Aprendiz"
-]
+# ID da planilha (copie da URL do Google Sheets)
+SHEET_ID = "SEU_ID_DA_PLANILHA"
+sheet = client.open_by_key(SHEET_ID).sheet1
 
-# Inicializa o estado da sessão
-if "entregas" not in st.session_state:
-    st.session_state.entregas = {aprendiz: {atividade: False for atividade in atividades} for aprendiz in aprendizes}
+# ============================
+# FUNÇÕES PARA CARREGAR E SALVAR
+# ============================
+def carregar_dados():
+    data = sheet.get_all_records()
+    if data:
+        return pd.DataFrame(data)
+    else:
+        return pd.DataFrame(columns=["Aprendiz", "Atividade", "Entregue"])
 
-if "aprendizes" not in st.session_state:
-    st.session_state.aprendizes = aprendizes.copy()
+def salvar_dados(df):
+    sheet.clear()
+    sheet.update([df.columns.values.tolist()] + df.values.tolist())
 
-# Inicializa filtros no estado da sessão
-if "filtro_aprendiz" not in st.session_state:
-    st.session_state.filtro_aprendiz = "Todos"
-if "filtro_atividade" not in st.session_state:
-    st.session_state.filtro_atividade = "Todas"
+# ============================
+# CARREGAR DADOS INICIAIS
+# ============================
+df = carregar_dados()
 
-# Sidebar - Gerenciar aprendizes
-st.sidebar.header("Gerenciar Aprendizes")
-novo_aprendiz = st.sidebar.text_input("Adicionar novo aprendiz")
-if st.sidebar.button("Adicionar"):
-    if novo_aprendiz and novo_aprendiz not in st.session_state.aprendizes:
-        st.session_state.aprendizes.append(novo_aprendiz)
-        st.session_state.entregas[novo_aprendiz] = {atividade: False for atividade in atividades}
+# Se não houver dados, inicializa com exemplo
+if df.empty:
+    aprendizes = ["Aprendiz 1", "Aprendiz 2"]
+    atividades = ["Minha Iniciação", "1ª Instrução"]
+    df = pd.DataFrame([(a, at, False) for a in aprendizes for at in atividades], columns=["Aprendiz", "Atividade", "Entregue"])
+    salvar_dados(df)
 
-aprendiz_remover = st.sidebar.selectbox("Remover aprendiz", st.session_state.aprendizes)
-if st.sidebar.button("Remover"):
-    st.session_state.aprendizes.remove(aprendiz_remover)
-    st.session_state.entregas.pop(aprendiz_remover, None)
-
-# Sidebar - Marcar entregas
-st.sidebar.header("Marcar Entregas")
-aprendiz_selecionado = st.sidebar.selectbox("Selecionar Aprendiz", st.session_state.aprendizes)
-for atividade in atividades:
-    st.session_state.entregas[aprendiz_selecionado][atividade] = st.sidebar.checkbox(
-        label=atividade,
-        value=st.session_state.entregas[aprendiz_selecionado][atividade],
-        key=f"{aprendiz_selecionado}_{atividade}"
-    )
-
-# Título
+# ============================
+# INTERFACE PRINCIPAL
+# ============================
 st.title("📘 Plataforma de Entregas de Atividades")
 
-# Filtros na interface principal
+# Filtros
 st.subheader("Filtros")
-st.session_state.filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + st.session_state.aprendizes, index=(["Todos"] + st.session_state.aprendizes).index(st.session_state.filtro_aprendiz))
-st.session_state.filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades, index=(["Todas"] + atividades).index(st.session_state.filtro_atividade))
+filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + sorted(df["Aprendiz"].unique()))
+filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + sorted(df["Atividade"].unique()))
 
-# Botão para remover filtros
+# Botão para limpar filtros
 if st.button("Remover Filtros"):
-    st.session_state.filtro_aprendiz = "Todos"
-    st.session_state.filtro_atividade = "Todas"
-
-# Monta a tabela completa
-tabela = pd.DataFrame(index=st.session_state.aprendizes, columns=atividades)
-for aprendiz in st.session_state.aprendizes:
-    for atividade in atividades:
-        tabela.loc[aprendiz, atividade] = "✔️" if st.session_state.entregas[aprendiz][atividade] else ""
+    filtro_aprendiz = "Todos"
+    filtro_atividade = "Todas"
 
 # Aplica filtros
-if st.session_state.filtro_aprendiz != "Todos":
-    tabela = tabela.loc[[st.session_state.filtro_aprendiz]]
-if st.session_state.filtro_atividade != "Todas":
-    tabela = tabela[[st.session_state.filtro_atividade]]
+df_filtrado = df.copy()
+if filtro_aprendiz != "Todos":
+    df_filtrado = df_filtrado[df_filtrado["Aprendiz"] == filtro_aprendiz]
+if filtro_atividade != "Todas":
+    df_filtrado = df_filtrado[df_filtrado["Atividade"] == filtro_atividade]
 
-# Exibe a tabela filtrada
+# Exibe tabela pivotada
+df_display = df_filtrado.pivot(index="Aprendiz", columns="Atividade", values="Entregue").fillna(False)
+df_display = df_display.applymap(lambda x: "✔️" if x else "")
 st.write("### Tabela de Entregas")
-st.dataframe(tabela)
+st.dataframe(df_display)
+
+# ============================
+# MARCAR ENTREGAS NA SIDEBAR
+# ============================
+st.sidebar.header("Marcar Entregas")
+aprendiz_sel = st.sidebar.selectbox("Selecionar Aprendiz", sorted(df["Aprendiz"].unique()))
+atividades_sel = df[df["Aprendiz"] == aprendiz_sel]["Atividade"].tolist()
+
+for at in atividades_sel:
+    entregue = st.sidebar.checkbox(at, value=bool(df[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at)]["Entregue"].values[0]))
+    df.loc[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at), "Entregue"] = entregue
+
+# ============================
+# BOTÃO PARA SALVAR NO GOOGLE SHEETS
+# ============================
+if st.button("Salvar Alterações"):
+    salvar_dados(df)
+    st.success("✅ Dados salvos no Google Sheets com sucesso!")
