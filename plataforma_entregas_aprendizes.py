@@ -124,8 +124,8 @@ else:
         .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
         .fillna(False)
         .applymap(lambda x: "✔️" if x else "")
-        .sort_index(axis=0)
-        .sort_index(axis=1)
+        #.sort_index(axis=0)
+        #.sort_index(axis=1)
     )
     st.dataframe(df_display, use_container_width=True)
 
