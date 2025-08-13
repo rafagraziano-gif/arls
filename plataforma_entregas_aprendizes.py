@@ -139,7 +139,7 @@ else:
             return ["background-color: lightgreen; font-weight: bold"] * len(valores)
         return ["font-weight: bold"] * len(valores)
     
-    styled_df = df_display.style.apply(destacar_linha_completa, axis=1
+    styled_df = df_display.style.apply(destacar_linha_completa, axis=1)
 
     st.dataframe(styled_df, use_container_width=True)
 
