@@ -76,8 +76,12 @@ aprendiz_sel = st.sidebar.selectbox("Selecionar Aprendiz", sorted(df["Aprendiz"]
 atividades_sel = df[df["Aprendiz"] == aprendiz_sel]["Atividade"].tolist()
 
 for at in atividades_sel:
-    entregue = bool(df[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at)]["Entregue"].values[0])
-    novo_valor = st.sidebar.checkbox(at, value=entregue, key=f"{aprendiz_sel}_{at}")
-    if novo_valor != entregue:
+    entregue_atual = bool(df[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at)]["Entregue"].values[0])
+    novo_valor = st.sidebar.checkbox(at, value=entregue_atual, key=f"{aprendiz_sel}_{at}")
+    
+    # Atualiza sempre, mesmo que seja desmarcação
+    if novo_valor != entregue_atual:
         df.loc[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at), "Entregue"] = novo_valor
-        salvar_dados(df)
+
+# Salva após processar todos os checkboxes
+salvar_dados(df)
