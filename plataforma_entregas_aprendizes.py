@@ -4,13 +4,10 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, date
 import re
-import string  # >>> MANTIDO (Title Case)
+import string
 
 st.set_page_config(page_title="Controle de Entrega de Trabalhos - APRENDIZES", page_icon="📘", layout="wide")
 
-# =======================
-# Configuração do Google Sheets
-# =======================
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
 client = gspread.authorize(creds)
@@ -18,7 +15,6 @@ client = gspread.authorize(creds)
 SHEET_ID = "1YnLFqXtLq95nV2gT6AU_5WTdfkk88cbWyL8e_duj0_Y"
 sheet = client.open_by_key(SHEET_ID).sheet1
 
-# >>> NOVO: adicionamos "Data Iniciação" ao esquema
 COLS = ["Aprendiz", "Atividade", "Entregue", "Data Iniciação"]
 
 ATIVIDADES_PADRAO = [
@@ -43,18 +39,15 @@ def _to_bool(v):
             return False
     return False
 
-# >>> MANTIDO: função para normalizar o nome
-def titlecase_nome(nome: str) -> str:
-    """Converte para Title Case, removendo espaços extras."""
+def uppercase_nome(nome: str) -> str:
+    """Converte para letras maiúsculas, removendo espaços extras."""
     if not isinstance(nome, str):
         return ""
-    return string.capwords(nome.strip(), sep=" ")
+    return nome.strip().upper()
 
-# >>> NOVO: utilitários para data
 RE_DDMMYYYY = re.compile(r"^\s*(\d{2})/(\d{2})/(\d{4})\s*$")
 
 def parse_ddmmyyyy(s: str):
-    """Valida e converte 'dd/mm/aaaa' para date. Retorna None se inválido."""
     if not isinstance(s, str):
         return None
     m = RE_DDMMYYYY.match(s)
@@ -72,14 +65,12 @@ def format_ddmmyyyy(d: date) -> str:
     return d.strftime("%d/%m/%Y")
 
 def anos_meses_desde(d: date, hoje: date = None) -> str:
-    """Retorna 'X anos e Y meses' desde d até hoje."""
     if d is None or pd.isna(d):
         return "—"
     if hoje is None:
         hoje = date.today()
     if d > hoje:
         return "—"
-    # Diferença em meses com ajuste pelo dia
     months = (hoje.year - d.year) * 12 + (hoje.month - d.month)
     if hoje.day < d.day:
         months -= 1
@@ -90,24 +81,16 @@ def anos_meses_desde(d: date, hoje: date = None) -> str:
     return f"{a_txt} e {m_txt}"
 
 def coerce_to_date_from_gs(v):
-    """
-    Converte valores vindos do Sheets para date:
-    - strings 'dd/mm/aaaa' ou ISO 'aaaa-mm-dd'
-    - números (serial do Sheets) -> data base 1899-12-30
-    """
     if v is None or (isinstance(v, float) and pd.isna(v)) or (isinstance(v, str) and v.strip() == ""):
         return None
     if isinstance(v, (int, float)):
-        # Serial do Google Sheets: dias desde 1899-12-30
         base = pd.to_datetime("1899-12-30")
         dt = base + pd.to_timedelta(int(v), unit="D")
         return dt.date()
     if isinstance(v, str):
-        # Tenta dd/mm/aaaa
         d = parse_ddmmyyyy(v)
         if d:
             return d
-        # Tenta parse genérico (aceita ISO)
         try:
             return pd.to_datetime(v, dayfirst=True).date()
         except Exception:
@@ -119,20 +102,14 @@ def carregar_dados_google():
     data = sheet.get_all_records(value_render_option='UNFORMATTED_VALUE')
     if data:
         df = pd.DataFrame(data)
-        # Garante colunas
         for c in COLS:
             if c not in df.columns:
                 df[c] = None
-        # Tipagens/conversões
         df["Aprendiz"] = df["Aprendiz"].astype(str)
         df["Atividade"] = df["Atividade"].astype(str)
         df["Entregue"] = df["Entregue"].map(_to_bool)
-
-        # >>> NOVO: normaliza Data Iniciação como date
         df["Data Iniciação"] = df["Data Iniciação"].apply(coerce_to_date_from_gs)
-
         return df[COLS]
-    # Planilha vazia
     return pd.DataFrame(columns=COLS)
 
 def salvar_dados_google(df: pd.DataFrame):
@@ -140,10 +117,7 @@ def salvar_dados_google(df: pd.DataFrame):
     df["Aprendiz"] = df["Aprendiz"].fillna("")
     df["Atividade"] = df["Atividade"].fillna("")
     df["Entregue"] = df["Entregue"].map(lambda x: True if x is True else False)
-
-    # >>> NOVO: sempre salvar Data Iniciação como string 'dd/mm/aaaa' (ou vazio) para evitar serial numérico
     df["Data Iniciação"] = df["Data Iniciação"].apply(lambda d: format_ddmmyyyy(d) if isinstance(d, (date, datetime)) else (d if isinstance(d, str) else ""))
-
     sheet.clear()
     sheet.update(
         [df.columns.tolist()] + df.values.tolist(),
@@ -154,7 +128,6 @@ def inicializa_planilha_se_vazia():
     df = carregar_dados_google()
     if df.empty:
         aprendizes = [""]
-        # >>> NOVO: cria linhas com Data Iniciação vazia
         df = pd.DataFrame(
             [(a, at, False, None) for a in aprendizes for at in ATIVIDADES_PADRAO],
             columns=COLS
@@ -163,6 +136,7 @@ def inicializa_planilha_se_vazia():
         carregar_dados_google.clear()
         return carregar_dados_google()
     return df
+
 if "df" not in st.session_state:
     st.session_state.df = inicializa_planilha_se_vazia()
 if "ultima_atualizacao" not in st.session_state:
@@ -185,8 +159,7 @@ df = st.session_state.df.copy()
 st.subheader("Filtros")
 aprendizes_lista = sorted([a for a in df["Aprendiz"].unique() if a is not None])
 atividades_unicas = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
-atividades_ordenadas = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas] + \
-                       [a for a in atividades_unicas if a not in ATIVIDADES_PADRAO]
+atividades_ordenadas = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas] + [a for a in atividades_unicas if a not in ATIVIDADES_PADRAO]
 
 filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + aprendizes_lista, index=0)
 filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades_ordenadas, index=0)
@@ -201,17 +174,11 @@ if df_filtrado.empty:
     st.info("Nenhum registro encontrado com os filtros aplicados.")
 else:
     atividades_unicas_filtrado = list(dict.fromkeys(df_filtrado["Atividade"].dropna().tolist()))
-    atividades_ordenadas_filtrado = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_filtrado] + \
-                                    [a for a in atividades_unicas_filtrado if a not in ATIVIDADES_PADRAO]
+    atividades_ordenadas_filtrado = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_filtrado] + [a for a in atividades_unicas_filtrado if a not in ATIVIDADES_PADRAO]
 
     df_ord = df_filtrado.copy()
-    df_ord["Atividade"] = pd.Categorical(
-        df_ord["Atividade"],
-        categories=atividades_ordenadas_filtrado,
-        ordered=True
-    )
+    df_ord["Atividade"] = pd.Categorical(df_ord["Atividade"], categories=atividades_ordenadas_filtrado, ordered=True)
 
-    # Pivot de Entregas
     df_display = (
         df_ord
         .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
@@ -221,8 +188,6 @@ else:
         .applymap(lambda x: "🟢" if x is True else "🔴")
     )
 
-    # >>> NOVO: Colunas adicionais: Data de Iniciação e Tempo (anos/meses)
-    # Pega a primeira Data Iniciação não nula por Aprendiz
     datas_por_aprendiz = (
         df_ord[['Aprendiz', 'Data Iniciação']]
         .drop_duplicates()
@@ -234,7 +199,6 @@ else:
     data_fmt = datas_por_aprendiz.apply(lambda d: format_ddmmyyyy(d) if d else "—")
     tempo_fmt = datas_por_aprendiz.apply(lambda d: anos_meses_desde(d))
 
-    # insere as colunas à esquerda (logo após o nome)
     df_display.insert(0, "Tempo desde Iniciação", tempo_fmt.reindex(df_display.index).fillna("—"))
     df_display.insert(0, "Data de Iniciação", data_fmt.reindex(df_display.index).fillna("—"))
 
@@ -243,21 +207,14 @@ else:
             return ["background-color: lightgreen; font-weight: bold"] * len(valores)
         return ["font-weight: bold"] * len(valores)
 
-    # Atenção: st.dataframe não aplica Styler. Se quiser manter o estilo, use st.table.
-    # Aqui manterei como estava, mas com a observação acima.
     styled_df = df_display.style.apply(destacar_linha_completa, axis=1)
-
     st.dataframe(styled_df, use_container_width=True)
 
-# =======================
-# Barra lateral - Gerenciar Aprendizes
-# =======================
 st.sidebar.header("Gerenciar Aprendizes")
 
-# >>> MANTIDO: callback para normalizar nome
 def _normalizar_input_novo_aprendiz():
     valor = st.session_state.get("novo_aprendiz_input", "")
-    st.session_state["novo_aprendiz_input"] = titlecase_nome(valor)
+    st.session_state["novo_aprendiz_input"] = uppercase_nome(valor)
 
 novo_aprendiz = st.sidebar.text_input(
     "Adicionar novo aprendiz",
@@ -265,7 +222,6 @@ novo_aprendiz = st.sidebar.text_input(
     on_change=_normalizar_input_novo_aprendiz
 )
 
-# >>> NOVO: input de Data de Iniciação (com validação 'dd/mm/aaaa')
 novo_aprendiz_data_str = st.sidebar.text_input(
     "Data de iniciação (dd/mm/aaaa)",
     placeholder="dd/mm/aaaa",
@@ -274,7 +230,7 @@ novo_aprendiz_data_str = st.sidebar.text_input(
 )
 
 if st.sidebar.button("Adicionar", key="botao_adicionar_aprendiz"):
-    novo_aprendiz_norm = titlecase_nome(st.session_state.get("novo_aprendiz_input", ""))
+    novo_aprendiz_norm = uppercase_nome(st.session_state.get("novo_aprendiz_input", ""))
     data_ok = parse_ddmmyyyy(st.session_state.get("novo_aprendiz_data_input", ""))
 
     if not novo_aprendiz_norm:
@@ -284,18 +240,15 @@ if st.sidebar.button("Adicionar", key="botao_adicionar_aprendiz"):
     elif data_ok > date.today():
         st.sidebar.warning("A data de iniciação não pode ser futura.")
     else:
-        # Checagem de duplicidade (insensível a capitalização/espacos)
-        nomes_existentes_norm = pd.Series(df["Aprendiz"].fillna("")).apply(titlecase_nome)
+        nomes_existentes_norm = pd.Series(df["Aprendiz"].fillna("")).apply(uppercase_nome)
         if novo_aprendiz_norm in nomes_existentes_norm.values:
             st.sidebar.warning("Este aprendiz já existe.")
         else:
             atividades_unicas_all = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
-            atividades_existentes = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_all] + \
-                                    [a for a in atividades_unicas_all if a not in ATIVIDADES_PADRAO]
+            atividades_existentes = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_all] + [a for a in atividades_unicas_all if a not in ATIVIDADES_PADRAO]
             if len(atividades_existentes) == 0:
                 atividades_existentes = ATIVIDADES_PADRAO
 
-            # >>> NOVO: replica a Data Iniciação em todas as atividades do aprendiz (modelo long)
             novos_registros = pd.DataFrame(
                 [(novo_aprendiz_norm, at, False, data_ok) for at in atividades_existentes],
                 columns=COLS
@@ -316,9 +269,6 @@ if len(aprendizes_lista) > 0:
 else:
     st.sidebar.info("Não há aprendizes para remover.")
 
-# =======================
-# Barra lateral - Marcar Entregas
-# =======================
 st.sidebar.header("Marcar Entregas")
 if len(aprendizes_lista) > 0:
     aprendiz_sel = st.sidebar.selectbox("Selecionar Aprendiz", aprendizes_lista)
