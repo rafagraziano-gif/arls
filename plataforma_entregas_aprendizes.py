@@ -42,7 +42,6 @@ def _to_bool(v):
             return True
         if s in ("false", "0", "no", "n", "não", "nao", "falso", ""):
             return False
-    # fallback
     return False
 
 @st.cache_data(show_spinner=False)
@@ -52,35 +51,28 @@ def carregar_dados_google():
     data = sheet.get_all_records(value_render_option='UNFORMATTED_VALUE')
     if data:
         df = pd.DataFrame(data)
-        # Garante colunas esperadas
         for c in COLS:
             if c not in df.columns:
                 df[c] = None
 
-        # Tipos / normalização
         df["Aprendiz"] = df["Aprendiz"].astype(str)
         df["Atividade"] = df["Atividade"].astype(str)
         df["Entregue"] = df["Entregue"].map(_to_bool)
 
-        df = df[COLS]
-        return df
-    else:
-        return pd.DataFrame(columns=COLS)
+        return df[COLS]
+    return pd.DataFrame(columns=COLS)
 
 def salvar_dados_google(df: pd.DataFrame):
     """Sobrescreve a planilha com o DataFrame atual."""
-    # Evita NaN nas colunas de texto
     df = df.copy()
     df["Aprendiz"] = df["Aprendiz"].fillna("")
     df["Atividade"] = df["Atividade"].fillna("")
-    # Garante booleanos puros (True/False) antes de enviar
     df["Entregue"] = df["Entregue"].map(lambda x: True if x is True else False)
 
     sheet.clear()
-    # IMPORTANTE: USER_ENTERED faz o Sheets interpretar como booleans
     sheet.update(
         [df.columns.tolist()] + df.values.tolist(),
-        value_input_option='USER_ENTERED'
+        value_input_option='USER_ENTERED'  # Sheets interpreta como booleano
     )
 
 def inicializa_planilha_se_vazia():
@@ -93,10 +85,10 @@ def inicializa_planilha_se_vazia():
             columns=COLS
         )
         salvar_dados_google(df)
-        # Limpa cache e relê
         carregar_dados_google.clear()
         return carregar_dados_google()
     return df
+
 # =======================
 # Estado da sessão
 # =======================
@@ -113,7 +105,6 @@ with col_tit:
     st.title("📘 Plataforma de Entregas de Atividades")
 with col_btn:
     if st.button("🔄 Atualizar do Google Sheets", use_container_width=True, help="Recarrega os dados diretamente da planilha"):
-        # Limpa cache, recarrega e atualiza estado
         carregar_dados_google.clear()
         st.session_state.df = carregar_dados_google()
         st.session_state.ultima_atualizacao = datetime.now()
@@ -128,11 +119,17 @@ df = st.session_state.df.copy()
 # Filtros
 # =======================
 st.subheader("Filtros")
+
+# Aprendizes em ordem alfabética
 aprendizes_lista = sorted([a for a in df["Aprendiz"].unique() if a is not None])
-atividades_lista = sorted([a for a in df["Atividade"].unique() if a is not None])
+
+# Atividades: primeiro as da ordem canônica, depois extras (na ordem que aparecem)
+atividades_unicas = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
+atividades_ordenadas = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas] + \
+                       [a for a in atividades_unicas if a not in ATIVIDADES_PADRAO]
 
 filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + aprendizes_lista, index=0)
-filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades_lista, index=0)
+filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades_ordenadas, index=0)
 
 df_filtrado = df.copy()
 if filtro_aprendiz != "Todos":
@@ -146,15 +143,27 @@ if filtro_atividade != "Todas":
 if df_filtrado.empty:
     st.info("Nenhum registro encontrado com os filtros aplicados.")
 else:
-    df_display = (
-        df_filtrado
-        .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
-        .fillna(False)
-        # Mostra o check somente se for exatamente True (booleano)
-        .applymap(lambda x: "🟢" if x is True else "🔴")
-        .sort_index(axis=0)
-        .sort_index(axis=1)
+    # Define a ordem das colunas (X) e ordena as linhas (Y)
+    atividades_unicas_filtrado = list(dict.fromkeys(df_filtrado["Atividade"].dropna().tolist()))
+    atividades_ordenadas_filtrado = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_filtrado] + \
+                                    [a for a in atividades_unicas_filtrado if a not in ATIVIDADES_PADRAO]
+
+    df_ord = df_filtrado.copy()
+    df_ord["Atividade"] = pd.Categorical(
+        df_ord["Atividade"],
+        categories=atividades_ordenadas_filtrado,
+        ordered=True
     )
+
+    df_display = (
+        df_ord
+        .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
+        .reindex(columns=atividades_ordenadas_filtrado)   # eixo X na ordem desejada
+        .fillna(False)
+        .sort_index(axis=0)                               # eixo Y alfabético
+        .applymap(lambda x: "🟢" if x is True else "🔴")  # ícones
+    )
+
     st.dataframe(df_display, use_container_width=True)
 
 # =======================
@@ -167,16 +176,19 @@ novo_aprendiz = st.sidebar.text_input("Adicionar novo aprendiz")
 if st.sidebar.button("Adicionar"):
     if novo_aprendiz:
         if novo_aprendiz not in df["Aprendiz"].unique():
-            atividades_existentes = df["Atividade"].unique()
+            # Ao criar registros, use a ordem canônica; se houver extras na base, entram no fim
+            atividades_unicas_all = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
+            atividades_existentes = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_all] + \
+                                    [a for a in atividades_unicas_all if a not in ATIVIDADES_PADRAO]
             if len(atividades_existentes) == 0:
                 atividades_existentes = ATIVIDADES_PADRAO
+
             novos_registros = pd.DataFrame(
                 [(novo_aprendiz, at, False) for at in atividades_existentes],
                 columns=COLS
             )
             df = pd.concat([df, novos_registros], ignore_index=True)
             salvar_dados_google(df)
-            # Atualiza estado e mostra mensagem
             st.session_state.df = df
             st.sidebar.success(f"{novo_aprendiz} adicionado!")
         else:
@@ -211,7 +223,6 @@ if len(aprendizes_lista) > 0:
             df.loc[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at), "Entregue"] = novo_valor
             alterou = True
 
-    # Salva somente se houve alteração
     if alterou:
         salvar_dados_google(df)
         st.session_state.df = df
