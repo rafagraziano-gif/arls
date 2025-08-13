@@ -164,27 +164,7 @@ else:
         .applymap(lambda x: "🟢" if x is True else "🔴")  # ícones
     )
 
-# Tema manual para ajustar cor dos eixos
-tema = st.radio("Tema da Tabela", ["Claro", "Escuro"], horizontal=True)
-
-def estilo_tabela(df, tema):
-    cor = "white" if tema == "Escuro" else "black"
-    return df.style.set_table_styles([
-        {"selector": "th", "props": [
-            ("font-weight", "bold"),
-            ("color", cor),
-        ]},
-        {"selector": "thead th", "props": [
-            ("font-weight", "bold"),
-            ("color", cor),
-        ]},
-        {"selector": "tbody th", "props": [
-            ("font-weight", "bold"),
-            ("color", cor),
-        ]}
-    ])
-
-st.write(estilo_tabela(df_display, tema), unsafe_allow_html=True)
+st.dataframe(df_display, use_container_width=True)
 
 # =======================
 # Barra lateral - Gerenciar Aprendizes
