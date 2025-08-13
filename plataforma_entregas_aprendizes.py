@@ -97,6 +97,12 @@ if "df" not in st.session_state:
 if "ultima_atualizacao" not in st.session_state:
     st.session_state.ultima_atualizacao = datetime.now()
 
+# Inicializa filtros no estado da sessão
+if "filtro_aprendiz" not in st.session_state:
+    st.session_state.filtro_aprendiz = "Todos"
+if "filtro_atividade" not in st.session_state:
+    st.session_state.filtro_atividade = "Todas"
+
 # =======================
 # Cabeçalho + Botão de atualização
 # =======================
@@ -128,14 +134,42 @@ atividades_unicas = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
 atividades_ordenadas = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas] + \
                        [a for a in atividades_unicas if a not in ATIVIDADES_PADRAO]
 
-filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + aprendizes_lista, index=0)
-filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades_ordenadas, index=0)
+# Garante que os valores persistidos nos filtros existem nas opções atuais
+opts_aprendiz = ["Todos"] + aprendizes_lista
+opts_atividade = ["Todas"] + atividades_ordenadas
+if st.session_state.filtro_aprendiz not in opts_aprendiz:
+    st.session_state.filtro_aprendiz = "Todos"
+if st.session_state.filtro_atividade not in opts_atividade:
+    st.session_state.filtro_atividade = "Todas"
 
+# Layout dos filtros + botão limpar
+col_f1, col_f2, col_f3 = st.columns([0.4, 0.4, 0.2])
+with col_f1:
+    st.selectbox(
+        "Filtrar por Aprendiz",
+        opts_aprendiz,
+        index=opts_aprendiz.index(st.session_state.filtro_aprendiz),
+        key="filtro_aprendiz"
+    )
+with col_f2:
+    st.selectbox(
+        "Filtrar por Atividade",
+        opts_atividade,
+        index=opts_atividade.index(st.session_state.filtro_atividade),
+        key="filtro_atividade"
+    )
+with col_f3:
+    if st.button("🧹 Limpar filtros", use_container_width=True, help="Redefine Aprendiz para 'Todos' e Atividade para 'Todas'"):
+        st.session_state.filtro_aprendiz = "Todos"
+        st.session_state.filtro_atividade = "Todas"
+        st.rerun()
+
+# Aplica filtros a partir do estado atual
 df_filtrado = df.copy()
-if filtro_aprendiz != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Aprendiz"] == filtro_aprendiz]
-if filtro_atividade != "Todas":
-    df_filtrado = df_filtrado[df_filtrado["Atividade"] == filtro_atividade]
+if st.session_state.filtro_aprendiz != "Todos":
+    df_filtrado = df_filtrado[df_filtrado["Aprendiz"] == st.session_state.filtro_aprendiz]
+if st.session_state.filtro_atividade != "Todas":
+    df_filtrado = df_filtrado[df_filtrado["Atividade"] == st.session_state.filtro_atividade]
 
 # =======================
 # Exibição da tabela
