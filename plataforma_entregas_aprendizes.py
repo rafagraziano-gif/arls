@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import string  # >>> NOVO
 
 st.set_page_config(page_title="Controle de Entrega de Trabalhos - APRENDIZES", page_icon="📘", layout="wide")
 
@@ -38,6 +39,14 @@ def _to_bool(v):
         if s in ("false", "0", "no", "n", "não", "nao", "falso", ""):
             return False
     return False
+
+# >>> NOVO: função para padronizar o nome com a primeira letra de cada palavra maiúscula
+def titlecase_nome(nome: str) -> str:
+    """Converte para Title Case, removendo espaços extras."""
+    if not isinstance(nome, str):
+        return ""
+    # string.capwords lida bem com Unicode e trata "  joão  da  silva  " -> "João Da Silva"
+    return string.capwords(nome.strip(), sep=" ")
 
 @st.cache_data(show_spinner=False)
 def carregar_dados_google():
@@ -148,10 +157,26 @@ else:
 # =======================
 st.sidebar.header("Gerenciar Aprendizes")
 
-novo_aprendiz = st.sidebar.text_input("Adicionar novo aprendiz", key="novo_aprendiz_input")
+# >>> NOVO: callback para normalizar o valor digitado no input assim que ele muda
+def _normalizar_input_novo_aprendiz():
+    valor = st.session_state.get("novo_aprendiz_input", "")
+    st.session_state["novo_aprendiz_input"] = titlecase_nome(valor)
+
+# >>> NOVO: aplica on_change para deixar o texto do input já em Title Case
+novo_aprendiz = st.sidebar.text_input(
+    "Adicionar novo aprendiz",
+    key="novo_aprendiz_input",
+    on_change=_normalizar_input_novo_aprendiz
+)
+
 if st.sidebar.button("Adicionar", key="botao_adicionar_aprendiz"):
-    if novo_aprendiz:
-        if novo_aprendiz not in df["Aprendiz"].unique():
+    # >>> NOVO: normaliza novamente por segurança antes de salvar/validar
+    novo_aprendiz_norm = titlecase_nome(st.session_state.get("novo_aprendiz_input", ""))
+
+    if novo_aprendiz_norm:
+        # >>> NOVO: checagem de duplicidade insensível a capitalização/espacos extras
+        nomes_existentes_norm = pd.Series(df["Aprendiz"].fillna("")).apply(titlecase_nome)
+        if novo_aprendiz_norm not in nomes_existentes_norm.values:
             atividades_unicas_all = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
             atividades_existentes = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_all] + \
                                     [a for a in atividades_unicas_all if a not in ATIVIDADES_PADRAO]
@@ -159,13 +184,13 @@ if st.sidebar.button("Adicionar", key="botao_adicionar_aprendiz"):
                 atividades_existentes = ATIVIDADES_PADRAO
 
             novos_registros = pd.DataFrame(
-                [(novo_aprendiz, at, False) for at in atividades_existentes],
+                [(novo_aprendiz_norm, at, False) for at in atividades_existentes],
                 columns=COLS
             )
             df = pd.concat([df, novos_registros], ignore_index=True)
             salvar_dados_google(df)
             st.session_state.df = df
-            st.sidebar.success(f"{novo_aprendiz} adicionado!")
+            st.sidebar.success(f"{novo_aprendiz_norm} adicionado!")
         else:
             st.sidebar.warning("Este aprendiz já existe.")
     else:
