@@ -105,6 +105,26 @@ atividades_ordenadas = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas] 
 filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + aprendizes_lista, index=0)
 filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades_ordenadas, index=0)
 
+
+def extrair_data(nome):
+    import re
+    match = re.search(r"\((\d{2}/\d{2}/\d{4})\)", nome)
+    if match:
+        try:
+            return datetime.strptime(match.group(1), "%d/%m/%Y")
+        except:
+            return None
+    return None
+
+def adicionar_tempo(df):
+    df = df.copy()
+    df["DataIniciacao"] = df["Aprendiz"].apply(extrair_data)
+    df["Tempo"] = df["DataIniciacao"].apply(lambda d: 
+        f"{relativedelta(datetime.now(), d).years}a {relativedelta(datetime.now(), d).months}m" if d else "")
+    df["Aprendiz"] = df.apply(lambda row: f"{row['Aprendiz']} - {row['Tempo']}" if row["Tempo"] else row["Aprendiz"], axis=1)
+    return df
+
+
 df_filtrado = df.copy()
 if filtro_aprendiz != "Todos":
     df_filtrado = df_filtrado[df_filtrado["Aprendiz"] == filtro_aprendiz]
@@ -148,7 +168,32 @@ else:
 # =======================
 st.sidebar.header("Gerenciar Aprendizes")
 
+from dateutil.relativedelta import relativedelta
+
 novo_aprendiz = st.sidebar.text_input("Adicionar novo aprendiz")
+data_iniciacao = st.sidebar.date_input("Data de iniciação", format="DD/MM/YYYY")
+
+if st.sidebar.button("Adicionar"):
+    if novo_aprendiz and data_iniciacao:
+        if novo_aprendiz not in df["Aprendiz"].unique():
+            atividades_unicas_all = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
+            atividades_existentes = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_all] +                                     [a for a in atividades_unicas_all if a not in ATIVIDADES_PADRAO]
+            if len(atividades_existentes) == 0:
+                atividades_existentes = ATIVIDADES_PADRAO
+
+            nome_formatado = f"{novo_aprendiz} ({data_iniciacao.strftime('%d/%m/%Y')})"
+            novos_registros = pd.DataFrame(
+                [(nome_formatado, at, False) for at in atividades_existentes],
+                columns=COLS
+            )
+            df = pd.concat([df, novos_registros], ignore_index=True)
+            salvar_dados_google(df)
+            st.session_state.df = df
+            st.sidebar.success(f"{novo_aprendiz} adicionado!")
+        else:
+            st.sidebar.warning("Este aprendiz já existe.")
+    else:
+        st.sidebar.warning("Informe um nome e uma data válidos.")
 if st.sidebar.button("Adicionar"):
     if novo_aprendiz:
         if novo_aprendiz not in df["Aprendiz"].unique():
