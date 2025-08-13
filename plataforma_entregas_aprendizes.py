@@ -44,11 +44,23 @@ for atividade in atividades:
 # Título
 st.title("📘 Plataforma de Entregas de Atividades")
 
-# Exibe a tabela com ícones
-st.write("### Tabela de Entregas")
+# Filtros na interface principal
+st.subheader("Filtros")
+filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + st.session_state.aprendizes)
+filtro_atividades = st.multiselect("Filtrar por Atividades", atividades, default=atividades)
+
+# Monta a tabela completa
 tabela = pd.DataFrame(index=st.session_state.aprendizes, columns=atividades)
 for aprendiz in st.session_state.aprendizes:
     for atividade in atividades:
         tabela.loc[aprendiz, atividade] = "✔️" if st.session_state.entregas[aprendiz][atividade] else ""
 
+# Aplica filtros
+if filtro_aprendiz != "Todos":
+    tabela = tabela.loc[[filtro_aprendiz]]
+if filtro_atividades:
+    tabela = tabela[filtro_atividades]
+
+# Exibe a tabela filtrada
+st.write("### Tabela de Entregas")
 st.dataframe(tabela)
