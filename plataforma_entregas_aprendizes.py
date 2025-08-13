@@ -134,7 +134,13 @@ else:
         .applymap(lambda x: "🟢" if x is True else "🔴")
     )
 
-    styled_df = df_display.style.applymap(lambda v: "font-weight: bold")
+    def destacar_linha_completa(valores):
+        if all(v == "🟢" for v in valores):
+            return ["background-color: lightgreen; font-weight: bold"] * len(valores)
+        return ["font-weight: bold"] * len(valores)
+    
+    styled_df = df_display.style.apply(destacar_linha_completa, axis=1
+
     st.dataframe(styled_df, use_container_width=True)
 
 # =======================
