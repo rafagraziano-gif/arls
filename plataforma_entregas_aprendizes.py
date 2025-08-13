@@ -18,6 +18,12 @@ if "entregas" not in st.session_state:
 if "aprendizes" not in st.session_state:
     st.session_state.aprendizes = aprendizes.copy()
 
+# Inicializa filtros no estado da sessão
+if "filtro_aprendiz" not in st.session_state:
+    st.session_state.filtro_aprendiz = "Todos"
+if "filtro_atividade" not in st.session_state:
+    st.session_state.filtro_atividade = "Todas"
+
 # Sidebar - Gerenciar aprendizes
 st.sidebar.header("Gerenciar Aprendizes")
 novo_aprendiz = st.sidebar.text_input("Adicionar novo aprendiz")
@@ -44,10 +50,15 @@ for atividade in atividades:
 # Título
 st.title("📘 Plataforma de Entregas de Atividades")
 
-# Filtros
+# Filtros na interface principal
 st.subheader("Filtros")
-filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + st.session_state.aprendizes)
-filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades)
+st.session_state.filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + st.session_state.aprendizes, index=(["Todos"] + st.session_state.aprendizes).index(st.session_state.filtro_aprendiz))
+st.session_state.filtro_atividade = st.selectbox("Filtrar por Atividade", ["Todas"] + atividades, index=(["Todas"] + atividades).index(st.session_state.filtro_atividade))
+
+# Botão para remover filtros
+if st.button("Remover Filtros"):
+    st.session_state.filtro_aprendiz = "Todos"
+    st.session_state.filtro_atividade = "Todas"
 
 # Monta a tabela completa
 tabela = pd.DataFrame(index=st.session_state.aprendizes, columns=atividades)
@@ -56,11 +67,4 @@ for aprendiz in st.session_state.aprendizes:
         tabela.loc[aprendiz, atividade] = "✔️" if st.session_state.entregas[aprendiz][atividade] else ""
 
 # Aplica filtros
-if filtro_aprendiz != "Todos":
-    tabela = tabela.loc[[filtro_aprendiz]]
-if filtro_atividade != "Todas":
-    tabela = tabela[[filtro_atividade]]
-
-# Exibe a tabela responsiva
-st.write("### Tabela de Entregas")
-st.dataframe(tabela, use_container_width=True)
+if st.session_state.filtro_aprendiz
