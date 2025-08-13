@@ -28,8 +28,8 @@ df = carregar_dados()
 
 # Se não houver dados, inicializa com exemplo
 if df.empty:
-    aprendizes = ["Aprendiz 1", "Aprendiz 2"]
-    atividades = ["Minha Iniciação", "1ª Instrução"]
+    aprendizes = [""]
+    atividades = ["Minha Iniciação", "1ª Instrução", "2ª Instrução", "3ª Instrução", "4ª Instrução", "5ª Instrução", "6ª Instrução", "7ª Instrução", "O Livro da Lei", "A Coluna Booz", "O Templo de Salomão", "A Pedra Bruta", "O Avental de Aprendiz", "O Bode na Maçonaria", "A Cadeia de União", "Questionário de Aprendiz"]
     df = pd.DataFrame([(a, at, False) for a in aprendizes for at in atividades], columns=["Aprendiz", "Atividade", "Entregue"])
     salvar_dados(df)
 
