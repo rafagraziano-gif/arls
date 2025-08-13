@@ -11,7 +11,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service
 client = gspread.authorize(creds)
 
 # ID da planilha (copie da URL do Google Sheets)
-SHEET_ID = "SEU_ID_DA_PLANILHA"
+SHEET_ID = "1YnLFqXtLq95nV2gT6AU_5WTdfkk88cbWyL8e_duj0_Y"
 sheet = client.open_by_key(SHEET_ID).sheet1
 
 # ============================
