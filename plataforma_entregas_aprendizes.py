@@ -24,12 +24,7 @@ ATIVIDADES_PADRAO = [
     "A Cadeia de União", "Questionário de Aprendiz"
 ]
 
-# =======================
-# Funções utilitárias
-# =======================
-
 def _to_bool(v):
-    """Converte qualquer coisa para bool de forma segura e previsível."""
     if isinstance(v, bool):
         return v
     if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -46,37 +41,30 @@ def _to_bool(v):
 
 @st.cache_data(show_spinner=False)
 def carregar_dados_google():
-    """Lê do Google Sheets e retorna um DataFrame padronizado."""
-    # Pede valores NÃO formatados para tentar receber booleanos reais
     data = sheet.get_all_records(value_render_option='UNFORMATTED_VALUE')
     if data:
         df = pd.DataFrame(data)
         for c in COLS:
             if c not in df.columns:
                 df[c] = None
-
         df["Aprendiz"] = df["Aprendiz"].astype(str)
         df["Atividade"] = df["Atividade"].astype(str)
         df["Entregue"] = df["Entregue"].map(_to_bool)
-
         return df[COLS]
     return pd.DataFrame(columns=COLS)
 
 def salvar_dados_google(df: pd.DataFrame):
-    """Sobrescreve a planilha com o DataFrame atual."""
     df = df.copy()
     df["Aprendiz"] = df["Aprendiz"].fillna("")
     df["Atividade"] = df["Atividade"].fillna("")
     df["Entregue"] = df["Entregue"].map(lambda x: True if x is True else False)
-
     sheet.clear()
     sheet.update(
         [df.columns.tolist()] + df.values.tolist(),
-        value_input_option='USER_ENTERED'  # Sheets interpreta como booleano
+        value_input_option='USER_ENTERED'
     )
 
 def inicializa_planilha_se_vazia():
-    """Se a planilha estiver vazia, cria linhas base para 1 aprendiz em branco e todas atividades."""
     df = carregar_dados_google()
     if df.empty:
         aprendizes = [""]
@@ -89,17 +77,11 @@ def inicializa_planilha_se_vazia():
         return carregar_dados_google()
     return df
 
-# =======================
-# Estado da sessão
-# =======================
 if "df" not in st.session_state:
     st.session_state.df = inicializa_planilha_se_vazia()
 if "ultima_atualizacao" not in st.session_state:
     st.session_state.ultima_atualizacao = datetime.now()
 
-# =======================
-# Cabeçalho + Botão de atualização
-# =======================
 col_tit, col_btn = st.columns([0.8, 0.2])
 with col_tit:
     st.title("📘 Plataforma de Entregas de Atividades")
@@ -112,18 +94,10 @@ with col_btn:
 
 st.caption(f"Última atualização local: {st.session_state.ultima_atualizacao.strftime('%d/%m/%Y %H:%M:%S')}")
 
-# Trabalhamos sempre com a cópia atual
 df = st.session_state.df.copy()
 
-# =======================
-# Filtros
-# =======================
 st.subheader("Filtros")
-
-# Aprendizes em ordem alfabética
 aprendizes_lista = sorted([a for a in df["Aprendiz"].unique() if a is not None])
-
-# Atividades: primeiro as da ordem canônica, depois extras (na ordem que aparecem)
 atividades_unicas = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
 atividades_ordenadas = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas] + \
                        [a for a in atividades_unicas if a not in ATIVIDADES_PADRAO]
@@ -137,13 +111,9 @@ if filtro_aprendiz != "Todos":
 if filtro_atividade != "Todas":
     df_filtrado = df_filtrado[df_filtrado["Atividade"] == filtro_atividade]
 
-# =======================
-# Exibição da tabela
-# =======================
 if df_filtrado.empty:
     st.info("Nenhum registro encontrado com os filtros aplicados.")
 else:
-    # Define a ordem das colunas (X) e ordena as linhas (Y)
     atividades_unicas_filtrado = list(dict.fromkeys(df_filtrado["Atividade"].dropna().tolist()))
     atividades_ordenadas_filtrado = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_filtrado] + \
                                     [a for a in atividades_unicas_filtrado if a not in ATIVIDADES_PADRAO]
@@ -158,25 +128,24 @@ else:
     df_display = (
         df_ord
         .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
-        .reindex(columns=atividades_ordenadas_filtrado)   # eixo X na ordem desejada
+        .reindex(columns=atividades_ordenadas_filtrado)
         .fillna(False)
-        .sort_index(axis=0)                               # eixo Y alfabético
-        .applymap(lambda x: "🟢" if x is True else "🔴")  # ícones
+        .sort_index(axis=0)
+        .applymap(lambda x: "🟢" if x is True else "🔴")
     )
 
-st.dataframe(df_display, use_container_width=True)
+    styled_df = df_display.style.applymap(lambda v: "font-weight: bold")
+    st.dataframe(styled_df, use_container_width=True)
 
 # =======================
 # Barra lateral - Gerenciar Aprendizes
 # =======================
 st.sidebar.header("Gerenciar Aprendizes")
 
-# Adicionar
 novo_aprendiz = st.sidebar.text_input("Adicionar novo aprendiz")
 if st.sidebar.button("Adicionar"):
     if novo_aprendiz:
         if novo_aprendiz not in df["Aprendiz"].unique():
-            # Ao criar registros, use a ordem canônica; se houver extras na base, entram no fim
             atividades_unicas_all = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
             atividades_existentes = [a for a in ATIVIDADES_PADRAO if a in atividades_unicas_all] + \
                                     [a for a in atividades_unicas_all if a not in ATIVIDADES_PADRAO]
@@ -196,7 +165,6 @@ if st.sidebar.button("Adicionar"):
     else:
         st.sidebar.warning("Informe um nome válido.")
 
-# Remover
 if len(aprendizes_lista) > 0:
     aprendiz_remover = st.sidebar.selectbox("Remover aprendiz", aprendizes_lista)
     if st.sidebar.button("Remover"):
