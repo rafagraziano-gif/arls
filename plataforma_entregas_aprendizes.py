@@ -27,21 +27,41 @@ ATIVIDADES_PADRAO = [
 # =======================
 # Funções utilitárias
 # =======================
+
+def _to_bool(v):
+    """Converte qualquer coisa para bool de forma segura e previsível."""
+    if isinstance(v, bool):
+        return v
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return False
+    if isinstance(v, (int, float)):
+        return v != 0
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("true", "1", "yes", "y", "sim", "verdadeiro"):
+            return True
+        if s in ("false", "0", "no", "n", "não", "nao", "falso", ""):
+            return False
+    # fallback
+    return False
+
 @st.cache_data(show_spinner=False)
 def carregar_dados_google():
     """Lê do Google Sheets e retorna um DataFrame padronizado."""
-    data = sheet.get_all_records()
+    # Pede valores NÃO formatados para tentar receber booleanos reais
+    data = sheet.get_all_records(value_render_option='UNFORMATTED_VALUE')
     if data:
         df = pd.DataFrame(data)
         # Garante colunas esperadas
         for c in COLS:
             if c not in df.columns:
                 df[c] = None
-        # Tipos
+
+        # Tipos / normalização
         df["Aprendiz"] = df["Aprendiz"].astype(str)
         df["Atividade"] = df["Atividade"].astype(str)
-        # Normaliza booleans
-        df["Entregue"] = df["Entregue"].apply(lambda x: bool(x) if pd.notnull(x) else False)
+        df["Entregue"] = df["Entregue"].map(_to_bool)
+
         df = df[COLS]
         return df
     else:
@@ -49,11 +69,19 @@ def carregar_dados_google():
 
 def salvar_dados_google(df: pd.DataFrame):
     """Sobrescreve a planilha com o DataFrame atual."""
-    # Evita NaN
-    df = df.fillna("")
+    # Evita NaN nas colunas de texto
+    df = df.copy()
+    df["Aprendiz"] = df["Aprendiz"].fillna("")
+    df["Atividade"] = df["Atividade"].fillna("")
+    # Garante booleanos puros (True/False) antes de enviar
+    df["Entregue"] = df["Entregue"].map(lambda x: True if x is True else False)
+
     sheet.clear()
-    # Converte para lista (booleans são suportados)
-    sheet.update([df.columns.tolist()] + df.values.tolist())
+    # IMPORTANTE: USER_ENTERED faz o Sheets interpretar como booleans
+    sheet.update(
+        [df.columns.tolist()] + df.values.tolist(),
+        value_input_option='USER_ENTERED'
+    )
 
 def inicializa_planilha_se_vazia():
     """Se a planilha estiver vazia, cria linhas base para 1 aprendiz em branco e todas atividades."""
@@ -69,7 +97,6 @@ def inicializa_planilha_se_vazia():
         carregar_dados_google.clear()
         return carregar_dados_google()
     return df
-
 # =======================
 # Estado da sessão
 # =======================
@@ -123,9 +150,10 @@ else:
         df_filtrado
         .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
         .fillna(False)
-        .applymap(lambda x: "✔️" if x else "")
-        #.sort_index(axis=0)
-        #.sort_index(axis=1)
+        # Mostra o check somente se for exatamente True (booleano)
+        .applymap(lambda x: "✔️" if x is True else "")
+        .sort_index(axis=0)
+        .sort_index(axis=1)
     )
     st.dataframe(df_display, use_container_width=True)
 
