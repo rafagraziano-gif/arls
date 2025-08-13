@@ -47,7 +47,7 @@ st.title("📘 Plataforma de Entregas de Atividades")
 # Filtros na interface principal
 st.subheader("Filtros")
 filtro_aprendiz = st.selectbox("Filtrar por Aprendiz", ["Todos"] + st.session_state.aprendizes)
-filtro_atividades = st.selectbox("Filtrar por Atividades", ["Todos"] + st.session_state.atividades)
+filtro_atividades = st.selectbox("Filtrar por Atividades", atividades, default=atividades)
 
 # Monta a tabela completa
 tabela = pd.DataFrame(index=st.session_state.aprendizes, columns=atividades)
