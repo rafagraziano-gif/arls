@@ -151,7 +151,7 @@ else:
         .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
         .fillna(False)
         # Mostra o check somente se for exatamente True (booleano)
-        .applymap(lambda x: "✔️" if x is True else "")
+        .applymap(lambda x: "✅" if x is True else "")
         .sort_index(axis=0)
         .sort_index(axis=1)
     )
