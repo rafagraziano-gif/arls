@@ -67,4 +67,11 @@ for aprendiz in st.session_state.aprendizes:
         tabela.loc[aprendiz, atividade] = "✔️" if st.session_state.entregas[aprendiz][atividade] else ""
 
 # Aplica filtros
-if st.session_state.filtro_aprendiz
+if st.session_state.filtro_aprendiz != "Todos":
+    tabela = tabela.loc[[st.session_state.filtro_aprendiz]]
+if st.session_state.filtro_atividade != "Todas":
+    tabela = tabela[[st.session_state.filtro_atividade]]
+
+# Exibe a tabela filtrada
+st.write("### Tabela de Entregas")
+st.dataframe(tabela)
