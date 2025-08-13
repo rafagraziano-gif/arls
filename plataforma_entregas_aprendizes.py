@@ -211,7 +211,7 @@ else:
         ordered=True
     )
 
-    # Pivot de Entregas
+    # Pivot de Entregas (como você já tem)
     df_display = (
         df_ord
         .pivot(index="Aprendiz", columns="Atividade", values="Entregue")
@@ -220,9 +220,8 @@ else:
         .sort_index(axis=0)
         .applymap(lambda x: "🟢" if x is True else "🔴")
     )
-
+    
     # >>> NOVO: Colunas adicionais: Data de Iniciação e Tempo (anos/meses)
-    # Pega a primeira Data Iniciação não nula por Aprendiz
     datas_por_aprendiz = (
         df_ord[['Aprendiz', 'Data Iniciação']]
         .drop_duplicates()
@@ -230,24 +229,35 @@ else:
         .groupby('Aprendiz', as_index=True)['Data Iniciação']
         .apply(lambda s: next((d for d in s if d is not None), None))
     )
-
+    
     data_fmt = datas_por_aprendiz.apply(lambda d: format_ddmmyyyy(d) if d else "—")
     tempo_fmt = datas_por_aprendiz.apply(lambda d: anos_meses_desde(d))
-
-    # insere as colunas à esquerda (logo após o nome)
+    
     df_display.insert(0, "Tempo desde Iniciação", tempo_fmt.reindex(df_display.index).fillna("—"))
     df_display.insert(0, "Data de Iniciação", data_fmt.reindex(df_display.index).fillna("—"))
-
+    
     def destacar_linha_completa(valores):
+        # mantém sua lógica de destacar linha toda em verde quando todas as atividades estão concluídas
         if all(v == "🟢" for v in valores if v in ("🟢", "🔴")):
             return ["background-color: lightgreen; font-weight: bold"] * len(valores)
         return ["font-weight: bold"] * len(valores)
-
-    # Atenção: st.dataframe não aplica Styler. Se quiser manter o estilo, use st.table.
-    # Aqui manterei como estava, mas com a observação acima.
-    styled_df = df_display.style.apply(destacar_linha_completa, axis=1)
-
-    st.dataframe(styled_df, use_container_width=True)
+    
+    # >>> ALTERADO: aplicar estilos para deixar índice (Aprendiz) e cabeçalhos (Atividades) em negrito
+    styled_df = (
+        df_display.style
+            .apply(destacar_linha_completa, axis=1)  # seu destaque por linha
+            .set_table_styles([
+                # Cabeçalhos das colunas (atividades e demais colunas)
+                {'selector': 'th.col_heading', 'props': [('font-weight', 'bold')]},
+                {'selector': 'th.col_heading.level0', 'props': [('font-weight', 'bold')]},
+                # Rótulos do índice (nomes dos aprendizes)
+                {'selector': 'th.row_heading', 'props': [('font-weight', 'bold')]},
+                {'selector': 'th.row_heading.level0', 'props': [('font-weight', 'bold')]},
+            ])
+    )
+    
+    # >>> IMPORTANTE: usar st.table para renderizar os estilos do Styler
+    st.table(styled_df)
 
 # =======================
 # Barra lateral - Gerenciar Aprendizes
