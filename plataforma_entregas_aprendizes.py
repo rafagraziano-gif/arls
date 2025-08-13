@@ -4,7 +4,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-st.set_page_config(page_title="Plataforma de Entregas", page_icon="📘", layout="wide")
+st.set_page_config(page_title="Controle de Entrega de Trabalhos - APRENDIZES", page_icon="📘", layout="wide")
 
 # =======================
 # Configuração do Google Sheets
@@ -84,7 +84,7 @@ if "ultima_atualizacao" not in st.session_state:
 
 col_tit, col_btn = st.columns([0.8, 0.2])
 with col_tit:
-    st.title("📘 Plataforma de Entregas de Atividades")
+    st.title("📘 Controle de Entrega de Trabalhos - APRENDIZES - A.R.L.S. Tropeiros de Sorocaba nº824")
 with col_btn:
     if st.button("🔄 Atualizar do Google Sheets", use_container_width=True, help="Recarrega os dados diretamente da planilha"):
         carregar_dados_google.clear()
