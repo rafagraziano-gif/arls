@@ -141,6 +141,9 @@ if "df" not in st.session_state:
     st.session_state.df = inicializa_planilha_se_vazia()
 if "ultima_atualizacao" not in st.session_state:
     st.session_state.ultima_atualizacao = datetime.now()
+# << ALTERAÇÕES AQUI: inicializa a variável de estado para o botão da lista de atividades
+if "show_lista_atividades" not in st.session_state:
+    st.session_state.show_lista_atividades = False
 
 col_tit, col_btn = st.columns([0.8, 0.2])
 with col_tit:
@@ -162,13 +165,12 @@ def gerar_lista_atividades():
     lista = "\n- ".join(ATIVIDADES_PADRAO)
     return f"Lista de Atividades:\n\n- {lista}"
 
-if "lista_atividades_texto" not in st.session_state:
-    st.session_state.lista_atividades_texto = ""
-
+# << ALTERAÇÕES AQUI: usa o estado de sessão para controlar a exibição
 if st.button("📋 Gerar Lista de Atividades"):
+    st.session_state.show_lista_atividades = not st.session_state.show_lista_atividades
     st.session_state.lista_atividades_texto = gerar_lista_atividades()
 
-if st.session_state.lista_atividades_texto:
+if st.session_state.show_lista_atividades and "lista_atividades_texto" in st.session_state:
     st.text_area("Lista de Atividades (copie o texto abaixo)", value=st.session_state.lista_atividades_texto, height=250)
 
 
@@ -292,37 +294,57 @@ else:
 
 st.sidebar.header("Marcar Entregas")
 if len(aprendizes_lista) > 0:
-    aprendiz_sel = st.sidebar.selectbox("Selecionar Aprendiz", aprendizes_lista)
+    # << ALTERAÇÕES AQUI: adiciona um callback para limpar o extrato quando o aprendiz muda
+    aprendiz_sel_old = st.session_state.get('aprendiz_sel_old', None)
     
-    # 1. Botão de extrato no menu lateral
+    def on_aprendiz_change():
+        if 'extrato_texto' in st.session_state:
+            del st.session_state['extrato_texto']
+        if 'show_extrato' in st.session_state:
+            st.session_state.show_extrato = False
+
+    aprendiz_sel = st.sidebar.selectbox("Selecionar Aprendiz", aprendizes_lista, key="aprendiz_sel_input", on_change=on_aprendiz_change)
+    st.session_state['aprendiz_sel_old'] = aprendiz_sel
+    
+    # << ALTERAÇÕES AQUI: Botão de extrato no menu lateral, com show/hide
     col_extrato1, col_extrato2 = st.sidebar.columns([0.2, 0.8])
     with col_extrato1:
-        if st.button("📋", key=f"btn_extrato_sidebar_{aprendiz_sel}", help=f"Gerar extrato de {aprendiz_sel}"):
-            # Lógica para gerar o extrato
-            extrato_df = df[df['Aprendiz'] == aprendiz_sel].copy()
-            data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
-            data_iniciacao_fmt = format_ddmmyyyy(data_iniciacao)
+        if st.button("📋", key=f"btn_extrato_sidebar_{aprendiz_sel}", help=f"Gerar/Ocultar extrato de {aprendiz_sel}"):
+            if f"extrato_texto_{aprendiz_sel}" not in st.session_state:
+                 # Se o extrato ainda não foi gerado, gere-o
+                extrato_df = df[df['Aprendiz'] == aprendiz_sel].copy()
+                data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
+                data_iniciacao_fmt = format_ddmmyyyyy(data_iniciacao)
+                
+                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: 'Entregue ✅', False: 'Pendente ❌'})
+                
+                texto = f"Extrato de Entregas - Aprendiz {aprendiz_sel}\n"
+                texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
+                
+                for _, row in extrato_df.iterrows():
+                    texto += f" - {row['Atividade']}: {row['Entregue']}\n"
+                
+                st.session_state[f"extrato_texto_{aprendiz_sel}"] = texto
             
-            extrato_df['Entregue'] = extrato_df['Entregue'].map({True: 'Entregue ✅', False: 'Pendente ❌'})
-            
-            texto = f"Extrato de Entregas - Aprendiz {aprendiz_sel}\n"
-            texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
-            
-            for _, row in extrato_df.iterrows():
-                texto += f" - {row['Atividade']}: {row['Entregue']}\n"
-            
-            st.session_state[f"extrato_texto_{aprendiz_sel}"] = texto
+            # Inverte o estado de show/hide para o extrato
+            if f"show_extrato_{aprendiz_sel}" not in st.session_state:
+                st.session_state[f"show_extrato_{aprendiz_sel}"] = True
+            else:
+                st.session_state[f"show_extrato_{aprendiz_sel}"] = not st.session_state[f"show_extrato_{aprendiz_sel}"]
 
-    with col_extrato2:
-        if f"extrato_texto_{aprendiz_sel}" in st.session_state and st.session_state[f"extrato_texto_{aprendiz_sel}"]:
-            st.text_area(
+
+    # << ALTERAÇÕES AQUI: Renderiza o text_area apenas se o estado for True
+    if st.session_state.get(f"show_extrato_{aprendiz_sel}", False):
+        if f"extrato_texto_{aprendiz_sel}" in st.session_state:
+            st.sidebar.text_area(
                 f"Extrato de {aprendiz_sel}",
                 value=st.session_state[f"extrato_texto_{aprendiz_sel}"],
                 height=250,
                 key=f"text_area_extrato_{aprendiz_sel}"
             )
 
-    # 2. Checkboxes para marcar entregas
+
+    # Checkboxes para marcar entregas
     atividades_sel = df[df["Aprendiz"] == aprendiz_sel]["Atividade"].tolist()
     alterou = False
     for at in atividades_sel:
