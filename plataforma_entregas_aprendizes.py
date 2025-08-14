@@ -5,6 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, date
 import re
 import string
+from streamlit_clipboard import st_copy_to_clipboard
 
 st.set_page_config(page_title="Controle de Entrega de Trabalhos - APRENDIZES", page_icon="📘", layout="wide")
 
@@ -156,6 +157,18 @@ st.caption(f"Última atualização local: {st.session_state.ultima_atualizacao.s
 
 df = st.session_state.df.copy()
 
+# Botão para gerar lista de atividades
+def gerar_lista_atividades_e_copiar():
+    """Gera a lista de atividades padrão e copia para o clipboard."""
+    lista = "\n- ".join(ATIVIDADES_PADRAO)
+    texto = f"Lista de Atividades:\n\n- {lista}"
+    st_copy_to_clipboard(texto)
+    st.info("Lista de atividades copiada para a área de transferência!")
+
+st.button("📋 Gerar e Copiar Lista de Atividades", on_click=gerar_lista_atividades_e_copiar)
+
+---
+
 st.subheader("Filtros")
 aprendizes_lista = sorted([a for a in df["Aprendiz"].unique() if a is not None])
 atividades_unicas = list(dict.fromkeys(df["Atividade"].dropna().tolist()))
@@ -208,7 +221,35 @@ else:
         return ["font-weight: bold"] * len(valores)
 
     styled_df = df_display.style.apply(destacar_linha_completa, axis=1)
+    
+    # Adicionando o botão de extrato para cada aprendiz
+    for aprendiz in df_display.index:
+        col1, col2 = st.columns([0.8, 0.2])
+        with col1:
+            st.markdown(f"**{aprendiz}**")
+        with col2:
+            def gerar_extrato_aprendiz_e_copiar(nome_aprendiz):
+                extrato_df = df[df['Aprendiz'] == nome_aprendiz].copy()
+                data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
+                data_iniciacao_fmt = format_ddmmyyyy(data_iniciacao)
+                
+                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: 'Entregue ✅', False: 'Pendente ❌'})
+                
+                texto = f"Extrato de Entregas - Aprendiz {nome_aprendiz}\n"
+                texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
+                
+                for _, row in extrato_df.iterrows():
+                    texto += f" - {row['Atividade']}: {row['Entregue']}\n"
+                
+                st_copy_to_clipboard(texto)
+                st.info(f"Extrato de {nome_aprendiz} copiado para a área de transferência!")
+
+            st.button("📋 Gerar e Copiar Extrato", key=f"btn_extrato_{aprendiz}", on_click=gerar_extrato_aprendiz_e_copiar, args=(aprendiz,))
+
     st.dataframe(styled_df, use_container_width=True)
+
+
+---
 
 st.sidebar.header("Gerenciar Aprendizes")
 
