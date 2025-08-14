@@ -5,7 +5,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, date
 import re
 import string
-from streamlit_clipboard import st_copy_to_clipboard
 
 st.set_page_config(page_title="Controle de Entrega de Trabalhos - APRENDIZES", page_icon="📘", layout="wide")
 
@@ -158,14 +157,20 @@ st.caption(f"Última atualização local: {st.session_state.ultima_atualizacao.s
 df = st.session_state.df.copy()
 
 # Botão para gerar lista de atividades
-def gerar_lista_atividades_e_copiar():
-    """Gera a lista de atividades padrão e copia para o clipboard."""
+def gerar_lista_atividades():
+    """Gera a lista de atividades padrão."""
     lista = "\n- ".join(ATIVIDADES_PADRAO)
-    texto = f"Lista de Atividades:\n\n- {lista}"
-    st_copy_to_clipboard(texto)
-    st.info("Lista de atividades copiada para a área de transferência!")
+    return f"Lista de Atividades:\n\n- {lista}"
 
-st.button("📋 Gerar e Copiar Lista de Atividades", on_click=gerar_lista_atividades_e_copiar)
+if "lista_atividades_texto" not in st.session_state:
+    st.session_state.lista_atividades_texto = ""
+
+if st.button("📋 Gerar Lista de Atividades"):
+    st.session_state.lista_atividades_texto = gerar_lista_atividades()
+
+if st.session_state.lista_atividades_texto:
+    st.text_area("Lista de Atividades (copie o texto abaixo)", value=st.session_state.lista_atividades_texto, height=250)
+
 
 st.divider()
 
@@ -228,7 +233,7 @@ else:
         with col1:
             st.markdown(f"**{aprendiz}**")
         with col2:
-            def gerar_extrato_aprendiz_e_copiar(nome_aprendiz):
+            def gerar_extrato_aprendiz(nome_aprendiz):
                 extrato_df = df[df['Aprendiz'] == nome_aprendiz].copy()
                 data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
                 data_iniciacao_fmt = format_ddmmyyyy(data_iniciacao)
@@ -240,11 +245,16 @@ else:
                 
                 for _, row in extrato_df.iterrows():
                     texto += f" - {row['Atividade']}: {row['Entregue']}\n"
-                
-                st_copy_to_clipboard(texto)
-                st.info(f"Extrato de {nome_aprendiz} copiado para a área de transferência!")
+                return texto
 
-            st.button("📋 Gerar e Copiar Extrato", key=f"btn_extrato_{aprendiz}", on_click=gerar_extrato_aprendiz_e_copiar, args=(aprendiz,))
+            if f"extrato_texto_{aprendiz}" not in st.session_state:
+                st.session_state[f"extrato_texto_{aprendiz}"] = ""
+
+            if st.button("📋 Gerar Extrato", key=f"btn_extrato_{aprendiz}"):
+                st.session_state[f"extrato_texto_{aprendiz}"] = gerar_extrato_aprendiz(aprendiz)
+            
+            if st.session_state[f"extrato_texto_{aprendiz}"]:
+                st.text_area(f"Extrato de {aprendiz}", value=st.session_state[f"extrato_texto_{aprendiz}"], height=250, key=f"text_area_{aprendiz}")
 
     st.dataframe(styled_df, use_container_width=True)
 
