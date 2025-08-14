@@ -5,6 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, date
 import re
 import string
+from streamlit_clipboard import st_copy_to_clipboard
 
 st.set_page_config(page_title="Controle de Entrega de Trabalhos - APRENDIZES", page_icon="📘", layout="wide")
 
@@ -156,21 +157,13 @@ st.caption(f"Última atualização local: {st.session_state.ultima_atualizacao.s
 
 df = st.session_state.df.copy()
 
-# Botão para gerar lista de atividades
-def gerar_lista_atividades():
+# Botão para gerar e copiar lista de atividades
+def gerar_lista_atividades_e_copiar():
     """Gera a lista de atividades padrão."""
     lista = "\n- ".join(ATIVIDADES_PADRAO)
     return f"Lista de Atividades:\n\n- {lista}"
 
-if "lista_atividades_texto" not in st.session_state:
-    st.session_state.lista_atividades_texto = ""
-
-if st.button("📋 Gerar Lista de Atividades"):
-    st.session_state.lista_atividades_texto = gerar_lista_atividades()
-
-if st.session_state.lista_atividades_texto:
-    st.text_area("Lista de Atividades (copie o texto abaixo)", value=st.session_state.lista_atividades_texto, height=250)
-
+st_copy_to_clipboard(gerar_lista_atividades_e_copiar(), button_label="📋 Copiar Lista de Atividades")
 
 st.divider()
 
@@ -247,14 +240,7 @@ else:
                     texto += f" - {row['Atividade']}: {row['Entregue']}\n"
                 return texto
 
-            if f"extrato_texto_{aprendiz}" not in st.session_state:
-                st.session_state[f"extrato_texto_{aprendiz}"] = ""
-
-            if st.button("📋 Gerar Extrato", key=f"btn_extrato_{aprendiz}"):
-                st.session_state[f"extrato_texto_{aprendiz}"] = gerar_extrato_aprendiz(aprendiz)
-            
-            if st.session_state[f"extrato_texto_{aprendiz}"]:
-                st.text_area(f"Extrato de {aprendiz}", value=st.session_state[f"extrato_texto_{aprendiz}"], height=250, key=f"text_area_{aprendiz}")
+            st_copy_to_clipboard(gerar_extrato_aprendiz(aprendiz), button_label="📋 Copiar Extrato", key=f"btn_extrato_{aprendiz}")
 
     st.dataframe(styled_df, use_container_width=True)
 
