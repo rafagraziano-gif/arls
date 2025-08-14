@@ -309,14 +309,14 @@ if len(aprendizes_lista) > 0:
     # << ALTERAÇÕES AQUI: Botão de extrato no menu lateral, com show/hide
     col_extrato1, col_extrato2 = st.sidebar.columns([0.2, 0.8])
     with col_extrato1:
-        if st.button("📋", key=f"btn_extrato_sidebar_{aprendiz_sel}", help=f"Gerar/Ocultar extrato de {aprendiz_sel}"):
+        if st.button("📋 Gerar Extrato do Aprendiz Selecionado", key=f"btn_extrato_sidebar_{aprendiz_sel}", help=f"Gerar/Ocultar extrato de {aprendiz_sel}"):
             if f"extrato_texto_{aprendiz_sel}" not in st.session_state:
                  # Se o extrato ainda não foi gerado, gere-o
                 extrato_df = df[df['Aprendiz'] == aprendiz_sel].copy()
                 data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
                 data_iniciacao_fmt = format_ddmmyyyyy(data_iniciacao)
                 
-                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: 'Entregue ✅', False: 'Pendente ❌'})
+                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: '✅', False: '❌'})
                 
                 texto = f"Extrato de Entregas - Aprendiz {aprendiz_sel}\n"
                 texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
