@@ -227,37 +227,7 @@ else:
 
     styled_df = df_display.style.apply(destacar_linha_completa, axis=1)
     
-    # Adicionando o botão de extrato para cada aprendiz
-    for aprendiz in df_display.index:
-        col1, col2 = st.columns([0.8, 0.2])
-        with col1:
-            st.markdown(f"**{aprendiz}**")
-        with col2:
-            def gerar_extrato_aprendiz(nome_aprendiz):
-                extrato_df = df[df['Aprendiz'] == nome_aprendiz].copy()
-                data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
-                data_iniciacao_fmt = format_ddmmyyyy(data_iniciacao)
-                
-                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: '✅', False: '❌'})
-                
-                texto = f"Extrato de Entregas - Aprendiz {nome_aprendiz}\n"
-                texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
-                
-                for _, row in extrato_df.iterrows():
-                    texto += f" - {row['Atividade']}: {row['Entregue']}\n"
-                return texto
-
-            if f"extrato_texto_{aprendiz}" not in st.session_state:
-                st.session_state[f"extrato_texto_{aprendiz}"] = ""
-
-            if st.button("📋 Gerar Extrato", key=f"btn_extrato_{aprendiz}"):
-                st.session_state[f"extrato_texto_{aprendiz}"] = gerar_extrato_aprendiz(aprendiz)
-            
-            if st.session_state[f"extrato_texto_{aprendiz}"]:
-                st.text_area(f"Extrato de {aprendiz}", value=st.session_state[f"extrato_texto_{aprendiz}"], height=250, key=f"text_area_{aprendiz}")
-
     st.dataframe(styled_df, use_container_width=True)
-
 
 st.divider()
 
@@ -323,8 +293,37 @@ else:
 st.sidebar.header("Marcar Entregas")
 if len(aprendizes_lista) > 0:
     aprendiz_sel = st.sidebar.selectbox("Selecionar Aprendiz", aprendizes_lista)
-    atividades_sel = df[df["Aprendiz"] == aprendiz_sel]["Atividade"].tolist()
+    
+    # 1. Botão de extrato no menu lateral
+    col_extrato1, col_extrato2 = st.sidebar.columns([0.2, 0.8])
+    with col_extrato1:
+        if st.button("📋", key=f"btn_extrato_sidebar_{aprendiz_sel}", help=f"Gerar extrato de {aprendiz_sel}"):
+            # Lógica para gerar o extrato
+            extrato_df = df[df['Aprendiz'] == aprendiz_sel].copy()
+            data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
+            data_iniciacao_fmt = format_ddmmyyyy(data_iniciacao)
+            
+            extrato_df['Entregue'] = extrato_df['Entregue'].map({True: 'Entregue ✅', False: 'Pendente ❌'})
+            
+            texto = f"Extrato de Entregas - Aprendiz {aprendiz_sel}\n"
+            texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
+            
+            for _, row in extrato_df.iterrows():
+                texto += f" - {row['Atividade']}: {row['Entregue']}\n"
+            
+            st.session_state[f"extrato_texto_{aprendiz_sel}"] = texto
 
+    with col_extrato2:
+        if f"extrato_texto_{aprendiz_sel}" in st.session_state and st.session_state[f"extrato_texto_{aprendiz_sel}"]:
+            st.text_area(
+                f"Extrato de {aprendiz_sel}",
+                value=st.session_state[f"extrato_texto_{aprendiz_sel}"],
+                height=250,
+                key=f"text_area_extrato_{aprendiz_sel}"
+            )
+
+    # 2. Checkboxes para marcar entregas
+    atividades_sel = df[df["Aprendiz"] == aprendiz_sel]["Atividade"].tolist()
     alterou = False
     for at in atividades_sel:
         entregue_atual = bool(df[(df["Aprendiz"] == aprendiz_sel) & (df["Atividade"] == at)]["Entregue"].values[0])
