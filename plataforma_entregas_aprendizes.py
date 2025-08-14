@@ -238,7 +238,7 @@ else:
                 data_iniciacao = extrato_df['Data Iniciação'].iloc[0]
                 data_iniciacao_fmt = format_ddmmyyyy(data_iniciacao)
                 
-                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: 'Entregue ✅', False: 'Pendente ❌'})
+                extrato_df['Entregue'] = extrato_df['Entregue'].map({True: '✅', False: '❌'})
                 
                 texto = f"Extrato de Entregas - Aprendiz {nome_aprendiz}\n"
                 texto += f"Iniciação: {data_iniciacao_fmt}\n\n"
