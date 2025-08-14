@@ -1,3 +1,4 @@
+pip install streamlit-clipboard
 import streamlit as st
 import pandas as pd
 import gspread
@@ -167,7 +168,7 @@ def gerar_lista_atividades_e_copiar():
 
 st.button("📋 Gerar e Copiar Lista de Atividades", on_click=gerar_lista_atividades_e_copiar)
 
----
+st.divider()
 
 st.subheader("Filtros")
 aprendizes_lista = sorted([a for a in df["Aprendiz"].unique() if a is not None])
@@ -249,7 +250,7 @@ else:
     st.dataframe(styled_df, use_container_width=True)
 
 
----
+st.divider()
 
 st.sidebar.header("Gerenciar Aprendizes")
 
